@@ -27,16 +27,28 @@ struct EmojiArtDocumentView: View {
                         .scaleEffect(zoomScale)
                         .position(convertFromEmojiCoordinates((0, 0), in: geometry))
                 )
-                .gesture(doubleTapToZoom(in: geometry.size))
+                .gesture(doubleTapToZoom(in: geometry.size).exclusively(before: singleTapGestureOnBackground()))
                 if document.backgroundImageFetchStatus == .fetching {
                     ProgressView().scaleEffect(2)
                 } else {
                     ForEach(document.emojis) { emoji in
-                        Text(emoji.text)
-                            .font(.system(size: fontSize(for: emoji)))
-                            .scaleEffect(zoomScale)
-                            .position(position(for: emoji, in: geometry))
+                        ZStack {
+                            if selectedEmojis.contains(emoji) {
+                                Rectangle.init()
+                                    .stroke(lineWidth: 10.0)
+                                    .size(geometry.size)
+                                    .scale(0.08)
+                                    .scaleEffect(zoomScale)
+                                    .position(position(for: emoji, in: geometry))
+                            }
+                            Text(emoji.text)
+                                .font(.system(size: fontSize(for: emoji)))
+                                .scaleEffect(zoomScale)
+                                .position(position(for: emoji, in: geometry))
+                        }
+                        .gesture(singleTapGesture(on: emoji))
                     }
+                    
                 }
             }
             .onDrop(of: [.plainText, .url, .image], isTargeted: nil) { providers, location in
@@ -146,6 +158,34 @@ struct EmojiArtDocumentView: View {
             }
             .onEnded { gestureScaleAtEnd in
                 steadyStateZoomScale *= gestureScaleAtEnd
+            }
+    }
+    
+    @State private var selectedEmojis: Set<EmojiArtModel.Emoji> = Set.init()
+    
+    private func selectEmoji(_ emoji: EmojiArtModel.Emoji) {
+        if selectedEmojis.contains(emoji) {
+            selectedEmojis.remove(emoji)
+        } else {
+            selectedEmojis.insert(emoji)
+        }
+    }
+    
+    private func singleTapGesture(on emoji: EmojiArtModel.Emoji) -> some Gesture {
+        TapGesture(count: 1)
+            .onEnded {
+                withAnimation {
+                    selectEmoji(emoji)
+                }
+            }
+    }
+    
+    private func singleTapGestureOnBackground() -> some Gesture {
+        TapGesture(count: 1)
+            .onEnded {
+                withAnimation {
+                    selectedEmojis.removeAll()
+                }
             }
     }
     
