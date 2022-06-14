@@ -247,3 +247,14 @@ extension Array where Element == NSItemProvider {
         loadObjects(ofType: theType, firstOnly: true, using: load)
     }
 }
+
+extension Set where Element: Identifiable {
+    mutating func toggleSelection(of element: Element) {
+        if self.contains(element) {
+            self.remove(element)
+        } else {
+            self.insert(element)
+        }
+    }
+}
+

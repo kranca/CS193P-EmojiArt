@@ -25,6 +25,7 @@ struct EmojiArtDocumentView: View {
                 Color.white.overlay(
                     OptionalImage(uiImage: document.backgroundImage)
                         .scaleEffect(zoomScale)
+                        //.scaleEffect(selectedEmojis.isEmpty ? zoomScale : steadyStateZoomScale)
                         .position(convertFromEmojiCoordinates((0, 0), in: geometry))
                 )
                 .gesture(doubleTapToZoom(in: geometry.size).exclusively(before: singleTapGestureOnBackground()))
@@ -34,19 +35,32 @@ struct EmojiArtDocumentView: View {
                     ForEach(document.emojis) { emoji in
                         ZStack {
                             if selectedEmojis.contains(emoji) {
-                                Rectangle.init()
-                                    .stroke(lineWidth: 10.0)
-                                    .size(geometry.size)
-                                    .scale(0.08)
-                                    .scaleEffect(zoomScale)
-                                    .position(position(for: emoji, in: geometry))
+                                ZStack {
+                                    Button(action: {
+                                        for emoji in selectedEmojis {
+                                            document.removeEmoji(emoji)
+                                        }
+                                        selectedEmojis.removeAll()
+                                    }, label: {
+                                        Image(systemName: "minus.rectangle")
+                                    })
+                                    .position(positionForDeleteSymbol(for: emoji, in: geometry))
+                                    Rectangle.init()
+                                        .stroke(lineWidth: 10.0)
+                                        .size(geometry.size)
+                                        .scale(0.08)
+                                        .scaleEffect(zoomScale)
+                                        .position(position(for: emoji, in: geometry))
+                                }
                             }
                             Text(emoji.text)
                                 .font(.system(size: fontSize(for: emoji)))
                                 .scaleEffect(zoomScale)
+                                //.scaleEffect(selectedEmojis.contains(emoji) ? zoomScale : 1.0)
                                 .position(position(for: emoji, in: geometry))
                         }
                         .gesture(singleTapGesture(on: emoji))
+                        //.onDrag { NSItemProvider(object: emoji.text as NSString) }
                     }
                     
                 }
@@ -86,6 +100,10 @@ struct EmojiArtDocumentView: View {
     
     private func position(for emoji: EmojiArtModel.Emoji, in geometry: GeometryProxy) -> CGPoint {
         convertFromEmojiCoordinates((emoji.x, emoji.y), in: geometry)
+    }
+    
+    private func positionForDeleteSymbol(for emoji: EmojiArtModel.Emoji, in geometry: GeometryProxy) -> CGPoint {
+        convertFromEmojiCoordinates((emoji.x + 35, emoji.y - 20), in: geometry)
     }
     
     private func convertToEmojiCoordinates(_ location: CGPoint, in geometry: GeometryProxy) -> (x: Int, y: Int) {
@@ -163,19 +181,11 @@ struct EmojiArtDocumentView: View {
     
     @State private var selectedEmojis: Set<EmojiArtModel.Emoji> = Set.init()
     
-    private func selectEmoji(_ emoji: EmojiArtModel.Emoji) {
-        if selectedEmojis.contains(emoji) {
-            selectedEmojis.remove(emoji)
-        } else {
-            selectedEmojis.insert(emoji)
-        }
-    }
-    
     private func singleTapGesture(on emoji: EmojiArtModel.Emoji) -> some Gesture {
         TapGesture(count: 1)
             .onEnded {
                 withAnimation {
-                    selectEmoji(emoji)
+                    selectedEmojis.toggleSelection(of: emoji)
                 }
             }
     }
@@ -192,6 +202,9 @@ struct EmojiArtDocumentView: View {
     var pallette: some View {
         ScrollingEmojisView(emojis: testEmojis)
             .font(.system(size: defaultEmojiFontSize))
+//            .onDrop(of: [.plainText], isTargeted: nil) { providers, _ in
+//                document.removeEmoji(providers)
+//            }
     }
     
     let testEmojis = "⭕️😄👽🕶🌎🌪☕️🏀🎲🛩🧨🚽📌✅⚠️🔴🔈🏴‍☠️🕸🐶🐐🌈"

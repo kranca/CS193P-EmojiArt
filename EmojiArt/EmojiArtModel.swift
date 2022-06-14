@@ -35,4 +35,10 @@ struct EmojiArtModel {
         uniqueEmojiId += 1
         emojis.append(Emoji(text: text, x: location.x, y: location.y, size: size, id: uniqueEmojiId))
     }
+    
+    mutating func removeEmoji(_ emoji: Emoji) {
+        if let index = emojis.firstIndex(where: { $0.id == emoji.id }) {
+            emojis.remove(at: index)
+        }
+    }
 }
