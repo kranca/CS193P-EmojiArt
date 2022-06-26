@@ -34,6 +34,7 @@ struct EmojiArtDocumentView: View {
                 } else {
                     ForEach(document.emojis) { emoji in
                         ZStack {
+                            // selection and delete icon for emojis
                             if selectedEmojis.contains(emoji) {
                                 ZStack {
                                     Button(action: {
@@ -44,6 +45,8 @@ struct EmojiArtDocumentView: View {
                                     }, label: {
                                         Image(systemName: "minus.rectangle")
                                     })
+                                    .font(.system(size: fontSize(for: emoji)))
+                                    .scaleEffect(zoomScale)
                                     .position(positionForDeleteSymbol(for: emoji, in: geometry))
                                     Rectangle.init()
                                         .stroke(lineWidth: 10.0)
