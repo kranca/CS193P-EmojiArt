@@ -54,20 +54,22 @@ struct EmojiArtDocumentView: View {
                                         .scale(0.08)
                                         .scaleEffect(zoomScale)
                                         .position(position(for: emoji, in: geometry))
+                                        //.position(selectedEmojis.isEmpty ? position(for: emoji, in: geometry) : positionSelectionOn(for: emoji, in: geometry))
                                 }
                             }
                             Text(emoji.text)
                                 .font(.system(size: fontSize(for: emoji)))
                                 .scaleEffect(zoomScale)
-                                //.scaleEffect(selectedEmojis.contains(emoji) ? zoomScale : 1.0)
+                                //.scaleEffect(selectedEmojis.contains(emoji) ? zoomScale : steadyStateZoomScale)
                                 .position(position(for: emoji, in: geometry))
+                                //.position(selectedEmojis.isEmpty ? position(for: emoji, in: geometry) : positionSelectionOn(for: emoji, in: geometry))
                         }
                         .gesture(singleTapGesture(on: emoji))
-                        //.onDrag { NSItemProvider(object: emoji.text as NSString) }
                     }
                     
                 }
             }
+            .clipped() // forces the view to stay within its given size so backgroung doesn't overlap with pallete
             .onDrop(of: [.plainText, .url, .image], isTargeted: nil) { providers, location in
                 return drop(providers: providers, at: location, in: geometry)
             }
@@ -105,8 +107,13 @@ struct EmojiArtDocumentView: View {
         convertFromEmojiCoordinates((emoji.x, emoji.y), in: geometry)
     }
     
+    private func positionSelectionOn(for emoji: EmojiArtModel.Emoji, in geometry: GeometryProxy) -> CGPoint {
+        convertFromEmojiCoordinatesSelectionOn((emoji.x, emoji.y), in: geometry)
+    }
+    
+    // moves position of delete symbol to upper right corner of selected emojis
     private func positionForDeleteSymbol(for emoji: EmojiArtModel.Emoji, in geometry: GeometryProxy) -> CGPoint {
-        convertFromEmojiCoordinates((emoji.x + 35, emoji.y - 20), in: geometry)
+        convertFromEmojiCoordinatesSelectionOn((emoji.x + 35, emoji.y - 20), in: geometry)
     }
     
     private func convertToEmojiCoordinates(_ location: CGPoint, in geometry: GeometryProxy) -> (x: Int, y: Int) {
@@ -123,6 +130,14 @@ struct EmojiArtDocumentView: View {
         return CGPoint(
             x: center.x + CGFloat(location.x) * zoomScale + panOffset.width,
             y: center.y + CGFloat(location.y) * zoomScale + panOffset.height
+        )
+    }
+    
+    private func convertFromEmojiCoordinatesSelectionOn(_ location: (x: Int, y: Int), in geometry: GeometryProxy) -> CGPoint {
+        let center = geometry.frame(in: .local).center
+        return CGPoint(
+            x: center.x + CGFloat(location.x) + panOffset.width,
+            y: center.y + CGFloat(location.y) + panOffset.height
         )
     }
     
@@ -158,6 +173,7 @@ struct EmojiArtDocumentView: View {
         if let image = image, image.size.width > 0, image.size.height > 0, size.width > 0, size.height > 0 { // if let image = image to check that image is not nil
             let hZoom = size.width / image.size.width
             let vZoom = size.height / image.size.height
+            // recenter
             steadyStatePanOffset = .zero
             steadyStateZoomScale = min(hZoom, vZoom)
         }

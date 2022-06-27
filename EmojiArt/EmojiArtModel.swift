@@ -27,6 +27,7 @@ struct EmojiArtModel {
         }
     }
     
+    // prevents from someone using Emoji() as free init
     init() { }
     
     private var uniqueEmojiId = 0
@@ -37,7 +38,7 @@ struct EmojiArtModel {
     }
     
     mutating func removeEmoji(_ emoji: Emoji) {
-        if let index = emojis.firstIndex(where: { $0.id == emoji.id }) {
+        if let index = emojis.index(matching: emoji) {
             emojis.remove(at: index)
         }
     }
