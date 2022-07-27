@@ -129,8 +129,8 @@ struct EmojiArtDocumentView: View {
     
     // MARK: - Zooming
     
-    @State private var steadyStateZoomScale: CGFloat = 1
-    @GestureState private var gestureZoomScale: CGFloat = 1
+    @State private var steadyStateZoomScale: CGFloat = 1 // zoom scale at the end of gesture
+    @GestureState private var gestureZoomScale: CGFloat = 1 // dynamic zoom scale while gesture is being performed
     
     private var zoomScale: CGFloat {
         steadyStateZoomScale * gestureZoomScale
@@ -139,10 +139,20 @@ struct EmojiArtDocumentView: View {
     private func zoomGesture() -> some Gesture {
         MagnificationGesture()
             .updating($gestureZoomScale) { latestGestureScale, gestureZoomScale, _ in
-                gestureZoomScale = latestGestureScale
+                if selectedEmojis.isEmpty {
+                    gestureZoomScale = latestGestureScale
+                } else {
+                    
+                    for emoji in selectedEmojis {
+                        document.scaleEmoji(emoji, by: latestGestureScale)
+                    }
+                }
             }
             .onEnded { gestureScaleAtEnd in
-                steadyStateZoomScale *= gestureScaleAtEnd
+                if selectedEmojis.isEmpty {
+                    steadyStateZoomScale *= gestureScaleAtEnd
+                }
+                selectedEmojis.removeAll()
             }
     }
     
@@ -220,7 +230,7 @@ struct EmojiArtDocumentView: View {
     private func fontSizeForSelectionSymbol(for emoji: EmojiArtModel.Emoji) -> CGFloat {
          CGFloat(emoji.size + 20)
      }
-
+    
     // MARK: - Palette
     
     var palette: some View {
