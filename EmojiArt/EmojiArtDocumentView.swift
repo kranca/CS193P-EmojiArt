@@ -40,7 +40,7 @@ struct EmojiArtDocumentView: View {
                                         .font(.system(size: fontSizeForSelectionSymbol(for: emoji)))
                                         .foregroundColor(.gray)
                                         .scaleEffect(zoomScale)
-                                        .position(position(for: emoji, in: geometry))
+                                        .position(positionSelectionOn(for: emoji, in: geometry))
                                     Button(action: {
                                         for emoji in selectedEmojis {
                                             document.removeEmoji(emoji)
@@ -58,9 +58,9 @@ struct EmojiArtDocumentView: View {
                             Text(emoji.text)
                                 .font(.system(size: fontSize(for: emoji)))
                                 .scaleEffect(zoomScale)
-                                .position(position(for: emoji, in: geometry))
+                                .position(selectedEmojis.contains(emoji) ? positionSelectionOn(for: emoji, in: geometry) : position(for: emoji, in: geometry))
                         }
-                        .gesture(singleTapGesture(on: emoji))
+                        .gesture(singleTapGesture(on: emoji).simultaneously(with: emojiPanGesture()))
                     }
                 }
             }
@@ -139,20 +139,24 @@ struct EmojiArtDocumentView: View {
     private func zoomGesture() -> some Gesture {
         MagnificationGesture()
             .updating($gestureZoomScale) { latestGestureScale, gestureZoomScale, _ in
+                //if no selection is done, perform normal zoomin on whole document
                 if selectedEmojis.isEmpty {
                     gestureZoomScale = latestGestureScale
+                // else scale emojis by gesture scale
                 } else {
-                    
                     for emoji in selectedEmojis {
                         document.scaleEmoji(emoji, by: latestGestureScale)
                     }
                 }
             }
             .onEnded { gestureScaleAtEnd in
+                //if no selection is done, perform normal zoomin on whole document
                 if selectedEmojis.isEmpty {
                     steadyStateZoomScale *= gestureScaleAtEnd
+                // else remove all selected emojis after ending scale gesture
+                } else {
+                    selectedEmojis.removeAll()
                 }
-                selectedEmojis.removeAll()
             }
     }
     
@@ -216,20 +220,56 @@ struct EmojiArtDocumentView: View {
     
     // moves position of delete symbol to upper right corner of selected emojis
     private func positionForDeleteSymbol(for emoji: EmojiArtModel.Emoji, in geometry: GeometryProxy) -> CGPoint {
-        convertFromEmojiCoordinatesSelectionOn((emoji.x, emoji.y), in: geometry)
+        convertFromEmojiCoordinatesDeleteSymbol((emoji.x, emoji.y), in: geometry)
     }
     
-    private func convertFromEmojiCoordinatesSelectionOn(_ location: (x: Int, y: Int), in geometry: GeometryProxy) -> CGPoint {
+    private func convertFromEmojiCoordinatesDeleteSymbol(_ location: (x: Int, y: Int), in geometry: GeometryProxy) -> CGPoint {
         let center = geometry.frame(in: .local).center
         return CGPoint(
-            x: center.x + CGFloat(location.x + 50) * zoomScale + panOffset.width,
-            y: center.y + CGFloat(location.y - 20) * zoomScale + panOffset.height
+            x: center.x + CGFloat(location.x + 50) * zoomScale + emojiPanOffset.width + panOffset.width,
+            y: center.y + CGFloat(location.y - 20) * zoomScale + emojiPanOffset.height + panOffset.height
         )
     }
     
     private func fontSizeForSelectionSymbol(for emoji: EmojiArtModel.Emoji) -> CGFloat {
          CGFloat(emoji.size + 20)
      }
+    
+    // MARK: - Emoji Panning
+    
+    @State private var emojiSteadyStatePanOffset: CGSize = CGSize.zero
+    @GestureState private var emojiGesturePanOffset: CGSize = CGSize.zero
+    
+    private var emojiPanOffset: CGSize {
+        (emojiSteadyStatePanOffset + emojiGesturePanOffset) * zoomScale
+    }
+    
+    private func emojiPanGesture() -> some Gesture {
+        DragGesture()
+            .updating($emojiGesturePanOffset) { latestDragGestureValue, emojiGesturePanOffset, _ in
+                emojiGesturePanOffset = latestDragGestureValue.translation / zoomScale
+            }
+            .onEnded { finalDragGestureValue in
+                // update new position on model for each selected emoji
+                for emoji in selectedEmojis {
+                    document.moveEmoji(emoji, by: finalDragGestureValue.translation / zoomScale)
+                }
+                selectedEmojis.removeAll()
+                emojiSteadyStatePanOffset = CGSize.zero
+            }
+    }
+    
+    private func positionSelectionOn(for emoji: EmojiArtModel.Emoji, in geometry: GeometryProxy) -> CGPoint {
+        convertFromEmojiCoordinatesSelectionOn((emoji.x, emoji.y), in: geometry)
+    }
+    
+    private func convertFromEmojiCoordinatesSelectionOn(_ location: (x: Int, y: Int), in geometry: GeometryProxy) -> CGPoint {
+        let center = geometry.frame(in: .local).center
+        return CGPoint(
+            x: center.x + CGFloat(location.x) * zoomScale + emojiPanOffset.width + panOffset.width,
+            y: center.y + CGFloat(location.y) * zoomScale + emojiPanOffset.height + panOffset.height
+        )
+    }
     
     // MARK: - Palette
     
@@ -238,7 +278,7 @@ struct EmojiArtDocumentView: View {
             .font(.system(size: defaultEmojiFontSize))
     }
     
-    let testEmojis = "😀😷🦠💉👻👀🐶🌲🌎🌞🔥🍎⚽️🚗🚓🚲🛩🚁🚀🛸🏠⌚️🎁🗝🔐❤️⛔️❌❓✅⚠️🎶➕➖🏳️"
+    let testEmojis = "⭕️😀😷🦠💉👻👀🐶🌲🌎🌞🔥🍎⚽️🚗🚓🚲🛩🚁🚀🛸🏠⌚️🎁🗝🔐❤️⛔️❌❓✅⚠️🎶➕➖🏳️"
 }
 
 struct ScrollingEmojisView: View {
