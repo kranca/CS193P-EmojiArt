@@ -10,16 +10,61 @@ import SwiftUI
 class EmojiArtDocument: ObservableObject {
     @Published private(set) var emojiArt: EmojiArtModel {
         didSet {
+            autosave()
             if emojiArt.background != oldValue.background {
                 fetchBackgroundImageDataIfNecessary()
             }
         }
     }
     
+    private var autosaveTimer: Timer?
+    
+    private func scheduleAutosave() {
+        autosaveTimer?.invalidate()
+        autosaveTimer = Timer.scheduledTimer(withTimeInterval: Autosave.coalesingInterval, repeats: false) { _ in
+            self.autosave()
+        }
+    }
+    
+    private struct Autosave {
+        static let filename = "Autosaved.emojiart"
+        static var url: URL? {
+            let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            return documentDirectory?.appendingPathComponent(filename)
+        }
+        static let coalesingInterval = 5.0
+    }
+    
+    private func autosave() {
+        if let url = Autosave.url {
+            save(to: url)
+        }
+    }
+    
+    private func save(to url: URL) {
+        // thisFunction prints "EmojiArtDocument.save(to: )"
+        let thisFunction = "\(String(describing: self)).\(#function)"
+        do {
+            let data: Data = try emojiArt.json()
+            print("\(thisFunction) json = \(String(data: data, encoding: .utf8) ?? "nil")")
+            try data.write(to: url)
+        } catch let encodingError where encodingError is EncodingError {
+            print("\(thisFunction) couldn't encode EmojiArt as JSON because \(encodingError.localizedDescription)")
+        } catch {
+            print("\(thisFunction) error = \(error)")
+            //print("EmojiArtDocument.save(to: ) error = \(error)")
+        }
+    }
+    
     init() {
-        emojiArt = EmojiArtModel()
-        emojiArt.addEmoji("🏀", at: (-100, -200), size: 40)
-        emojiArt.addEmoji("🐐", at: (50, 100), size: 80)
+        if let url = Autosave.url, let autosavedEmojiArt = try? EmojiArtModel(url: url) {
+            emojiArt = autosavedEmojiArt
+            fetchBackgroundImageDataIfNecessary()
+        } else {
+            emojiArt = EmojiArtModel()
+//        emojiArt.addEmoji("🏀", at: (-100, -200), size: 40)
+//        emojiArt.addEmoji("🐐", at: (50, 100), size: 80)
+        }
     }
     
     var emojis: [EmojiArtModel.Emoji] { emojiArt.emojis }
@@ -28,9 +73,12 @@ class EmojiArtDocument: ObservableObject {
     @Published var backgroundImage: UIImage?
     @Published var backgroundImageFetchStatus: BackgroundImageFetchStatus = .idle
     
-    enum BackgroundImageFetchStatus {
+    // MARK: - Background
+    
+    enum BackgroundImageFetchStatus: Equatable {
         case idle
         case fetching
+        case failed(URL)
     }
     
     private func fetchBackgroundImageDataIfNecessary() {
@@ -50,6 +98,9 @@ class EmojiArtDocument: ObservableObject {
                         if imageData != nil {
                             // if self is nil don't perform the rest of the line (.backgroundImage...)
                             self?.backgroundImage = UIImage(data: imageData!)
+                        }
+                        if self?.backgroundImage == nil {
+                            self?.backgroundImageFetchStatus = .failed(url)
                         }
                     }
                 }

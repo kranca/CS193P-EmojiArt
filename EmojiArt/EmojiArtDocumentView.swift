@@ -15,7 +15,7 @@ struct EmojiArtDocumentView: View {
     var body: some View {
         VStack(spacing: 0) {
             documentBody
-            palette
+            PaletteChooser(emojiFontSize: defaultEmojiFontSize)
         }
     }
     
@@ -70,12 +70,37 @@ struct EmojiArtDocumentView: View {
             }
             //.gesture(panGesture()) not recomended to use more than one .gesture on one given View
             .gesture(panGesture().simultaneously(with: zoomGesture()))
+            .alert(item: $alertToShow) { alertToShow in
+                // return Alert
+                alertToShow.alert()
+            }
+            .onChange(of: document.backgroundImageFetchStatus, perform: { status in
+                switch status {
+                case .failed(let url):
+                    showBackgroundImageFetchFailedAlert(url)
+                default:
+                    break
+                }
+            })
         }
+    }
+    
+    @State private var alertToShow: IdentifiableAlert?
+    
+    private func showBackgroundImageFetchFailedAlert(_ url: URL) {
+        alertToShow = IdentifiableAlert(id: "fetch failed: " + url.absoluteString, alert: {
+            Alert(
+            title: Text("Background Image Fetch"),
+            message: Text("Couldn't load image from \(url)."),
+            dismissButton: .default(Text("OK"))
+            )
+        })
     }
     
     // MARK: - Drag and Drop
     
     private func drop(providers: [NSItemProvider], at location: CGPoint, in geometry: GeometryProxy) -> Bool {
+        // .self passes down the type!
         var found = providers.loadObjects(ofType: URL.self) { url in
             document.setBackground(.url(url.imageURL))
         }
@@ -154,9 +179,8 @@ struct EmojiArtDocumentView: View {
                 if selectedEmojis.isEmpty {
                     steadyStateZoomScale *= gestureScaleAtEnd
                 // else remove all selected emojis after ending scale gesture
-                } else {
-                    selectedEmojis.removeAll()
                 }
+                selectedEmojis.removeAll()
             }
     }
     
@@ -269,30 +293,6 @@ struct EmojiArtDocumentView: View {
             x: center.x + CGFloat(location.x) * zoomScale + emojiPanOffset.width + panOffset.width,
             y: center.y + CGFloat(location.y) * zoomScale + emojiPanOffset.height + panOffset.height
         )
-    }
-    
-    // MARK: - Palette
-    
-    var palette: some View {
-        ScrollingEmojisView(emojis: testEmojis)
-            .font(.system(size: defaultEmojiFontSize))
-    }
-    
-    let testEmojis = "⭕️😀😷🦠💉👻👀🐶🌲🌎🌞🔥🍎⚽️🚗🚓🚲🛩🚁🚀🛸🏠⌚️🎁🗝🔐❤️⛔️❌❓✅⚠️🎶➕➖🏳️"
-}
-
-struct ScrollingEmojisView: View {
-    let emojis: String
-
-    var body: some View {
-        ScrollView(.horizontal) {
-            HStack {
-                ForEach(emojis.map { String($0) }, id: \.self) { emoji in
-                    Text(emoji)
-                        .onDrag { NSItemProvider(object: emoji as NSString) }
-                }
-            }
-        }
     }
 }
 
