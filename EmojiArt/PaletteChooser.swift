@@ -8,12 +8,12 @@
 import SwiftUI
 
 struct PaletteChooser: View {
-    var emojiFontSize: CGFloat = 40
+    @ScaledMetric private var emojiFontSize: CGFloat = 40
     var emojiFont: Font { .system(size: emojiFontSize) }
     
     @EnvironmentObject var store: PaletteStore
     
-    @State private var chosenPaletteIndex = 0
+    @SceneStorage("PaletteChooser.chosenPaletteIndex") private var chosenPaletteIndex = 0 // similar functionality as @State
     
     var body: some View {
         HStack {
