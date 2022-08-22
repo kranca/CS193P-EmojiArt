@@ -24,10 +24,10 @@ struct EmojiArtDocumentView: View {
     var documentBody: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.white.overlay(
-                    OptionalImage(uiImage: document.backgroundImage)
-                        .scaleEffect(zoomScale)
-                        .position(convertFromEmojiCoordinates((0, 0), in: geometry))
+                Color.white
+                OptionalImage(uiImage: document.backgroundImage)
+                    .scaleEffect(zoomScale)
+                    .position(convertFromEmojiCoordinates((0, 0), in: geometry)
                 )
                 .gesture(doubleTapToZoom(in: geometry.size).exclusively(before: singleTapGestureOnBackground()))
                 if document.backgroundImageFetchStatus == .fetching {
@@ -89,16 +89,85 @@ struct EmojiArtDocumentView: View {
                     zoomToFit(image, in: geometry.size)
                 }
             })
-            .toolbar {
-                UndoButton(
-                    undo: undoManager?.optionalUndoMenuItemTitle,
-                    redo: undoManager?.optionalRedoMenuItemTitle
-                )
+            .compactableToolbar {
+                AnimatedActionButton(title: "Paste Background", systemImage: "doc.on.clipboard") {
+                    pasteBackground()
+                }
+                if Camera.isAvailable {
+                    AnimatedActionButton(title: "Take Photo", systemImage: "camera") {
+                        backgroundPicker = .camera
+                    }
+                }
+                if PhotoLibrary.isAvailable {
+                    AnimatedActionButton(title: "Search Photos", systemImage: "photo") {
+                        backgroundPicker = .library
+                    }
+                }
+                if let undoManager = undoManager {
+                    if undoManager.canUndo {
+                        AnimatedActionButton(title: undoManager.undoActionName, systemImage: "arrow.uturn.backward") {
+                            undoManager.undo()
+                        }
+                    }
+                    if undoManager.canRedo {
+                        AnimatedActionButton(title: undoManager.redoActionName, systemImage: "arrow.uturn.forward") {
+                            undoManager.redo()
+                        }
+                    }
+                }
+                // in case Toolbar needs to be placed in the bottom of the screen
+//                ToolbarItemGroup(placement: .bottomBar) {
+//
+//                }
+            }
+            .sheet(item: $backgroundPicker) { pickerType in
+                switch pickerType {
+                case .camera: Camera(handlePickedImage: { image in handlePickedBackgroundImage(image) })
+                case .library: PhotoLibrary(handlePickedImage: { image in handlePickedBackgroundImage(image) })
+                }
             }
         }
     }
     
-    @State private var autozoom = false
+    // MARK: - Camera and Library handling
+    
+    private func handlePickedBackgroundImage(_ image: UIImage?) {
+        // need to review autozoom
+        autozoom = true
+        if let imageData = image?.jpegData(compressionQuality: 1.0) {
+            document.setBackground(.imageData(imageData), undoManager: undoManager)
+        }
+        backgroundPicker = nil
+    }
+    
+    // needs to be an Optional so that when equal nil sheet is not active
+    @State private var backgroundPicker: BackgroundPickerType?
+    
+    enum BackgroundPickerType: Identifiable {
+        var id: BackgroundPickerType { self }
+        
+        // another option is to make BackgroundPickerType a String instead of Identifiable
+        //var id: String { rawValue }
+        
+        case camera
+        case library
+    }
+    
+    // MARK: - Paste background
+    
+    private func pasteBackground() {
+        autozoom = true
+        if let imageData = UIPasteboard.general.image?.jpegData(compressionQuality: 1.0) {
+            document.setBackground(.imageData(imageData), undoManager: undoManager)
+        } else if let url = UIPasteboard.general.url?.imageURL {
+            document.setBackground(.url(url), undoManager: undoManager)
+        } else {
+            alertToShow = IdentifiableAlert(
+                title: "Paste Background",
+                message: "There is no image currenlty on the pasteboard."
+            )
+        }
+    }
     
     @State private var alertToShow: IdentifiableAlert?
     
@@ -174,6 +243,8 @@ struct EmojiArtDocumentView: View {
     
     @SceneStorage("EmojiArtDocumentView.steadyStateZoomScale") private var steadyStateZoomScale: CGFloat = 1 // zoom scale at the end of gesture
     @GestureState private var gestureZoomScale: CGFloat = 1 // dynamic zoom scale while gesture is being performed
+    
+    @State private var autozoom = false
     
     private var zoomScale: CGFloat {
         steadyStateZoomScale * gestureZoomScale

@@ -61,6 +61,21 @@ struct AnimatedActionButton: View {
 struct IdentifiableAlert: Identifiable {
     var id: String
     var alert: () -> Alert
+    
+    init(id: String, alert: @escaping () -> Alert) {
+        self.id = id
+        self.alert = alert
+    }
+    
+    init(id: String, title: String, message: String) {
+        self.id = id
+        alert = { Alert(title: Text(title), message: Text(message), dismissButton: .default(Text("Ok"))) }
+    }
+    
+    init(title: String, message: String) {
+        self.id = title + message
+        alert = { Alert(title: Text(title), message: Text(message), dismissButton: .default(Text("Ok"))) }
+    }
 }
 
 // a button that does undo (prefered) or redo
@@ -117,5 +132,67 @@ extension UndoManager {
     
     var optionalRedoMenuItemTitle: String? {
         canRedo ? redoMenuItemTitle : nil
+    }
+}
+
+extension View {
+    @ViewBuilder // if the UI needs to choose between multiple Views, @ViewBuilder needs to be added
+    func wrappedInNavigationViewToMakeDismissable(_ dismiss: (() -> Void)?) -> some View {
+        if UIDevice.current.userInterfaceIdiom != .pad, let dismiss = dismiss {
+            NavigationView {
+                self
+                    .navigationBarTitleDisplayMode(.inline)
+                    .dismissable(dismiss)
+            }
+            .navigationViewStyle(StackNavigationViewStyle()) // avoid side by side presentation by stacking Views on top of each other
+        } else {
+            self
+        }
+    }
+    
+    @ViewBuilder
+    func dismissable(_ dismiss: (() -> Void)?) -> some View {
+        if UIDevice.current.userInterfaceIdiom != .pad, let dismiss = dismiss {
+            self
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") {
+                            dismiss()
+                        }
+                    }
+                }
+        } else {
+            self
+        }
+    }
+}
+
+extension View {
+    func compactableToolbar<Content>(@ViewBuilder content: () -> Content) -> some View where Content: View {
+        self
+            .toolbar {
+                content().modifier(compactableIntoContextMenu())
+            }
+    }
+}
+
+struct compactableIntoContextMenu: ViewModifier {
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    
+    var compact: Bool { horizontalSizeClass == .compact }
+    
+    func body(content: Content) -> some View {
+        if compact {
+            Button {
+                
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .contextMenu {
+                content
+            }
+        } else {
+            content
+        }
     }
 }
